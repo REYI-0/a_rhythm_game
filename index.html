@@ -8,16 +8,21 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family
 canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 .screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}
 .screen.on{display:flex}
-button{font:inherit;color:inherit;background:#1a1f4d;border:2px solid var(--line);border-radius:10px;padding:10px 20px;cursor:pointer}
-button:hover,button:focus-visible{background:#2a3280;outline:none}
-button.sel{background:var(--acc);color:#04121a;border-color:#fff}
+button{font:inherit;color:#3c3c3c;background:#d9d9d9;border:1px solid #9a9a9a;border-radius:4px;padding:10px 20px;cursor:pointer}
+button:hover,button:focus-visible{background:#ececec;outline:none}
+button.sel{background:#62b4d4;color:#16323d;border-color:#3e8fb0}
 h1{font-size:clamp(2rem,7vw,4.5rem);margin:0;letter-spacing:.18em}
 h2{margin:0 0 12px}
 .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 22px;min-width:240px}
-#list button{display:block;width:100%;margin:6px 0}
-#diffs button,#diffs i{width:120px;height:44px;box-sizing:border-box;padding:0}
-#diffs i{display:inline-block;border:2px dashed #2a2f66;border-radius:10px}
+.panel{background:rgba(110,110,110,.5);border:1px solid rgba(255,255,255,.25);border-radius:4px;padding:18px 22px;min-width:240px}
+#select .row{align-items:flex-start;flex-wrap:nowrap;gap:5vw}
+.side{display:flex;flex-direction:column;align-items:center;gap:34px;padding-top:6vh}
+#list{width:min(42vw,520px);height:59vh;padding:0;overflow-y:auto;box-sizing:border-box}
+#list button{display:block;width:calc(100% - 16px);height:44px;margin:8px;padding:0}
+#diffs button,#diffs i{min-width:96px;height:48px;box-sizing:border-box;padding:0 10px}
+#diffs i{visibility:hidden}
+#sname{font-weight:400;font-size:2.2rem;margin:0;color:#f4f4f4;transform:perspective(500px) rotateY(-14deg) rotate(-3deg)}
+#start{width:210px;height:54px;transform:perspective(500px) rotateY(-12deg) rotate(3deg)}
 #fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .8s}
 small{opacity:.7}
 </style></head><body>
@@ -25,9 +30,9 @@ small{opacity:.7}
 <div id="intro" class="screen on"><h1>SOUND RHYTHM</h1><button id="play">PLAY</button></div>
 <div id="select" class="screen"><div class="row">
  <div class="panel" id="list"></div>
- <div class="panel"><h2 id="sname"></h2><div class="row" id="diffs"></div>
+ <div class="side"><h2 id="sname"></h2><div class="row" id="diffs"></div>
   <p><label><small>내 음악 파일 불러오기(선택)</small><br><input type="file" id="file" accept="audio/*"></label></p>
-  <button id="start">START</button></div></div></div>
+  <button id="start">Play</button></div></div></div>
 <div id="result" class="screen"><div class="panel"><h2>RESULT</h2><p id="rtxt"></p><button id="back">노래 선택으로</button></div></div>
 <div id="fade"></div>
 <script>
@@ -40,10 +45,10 @@ const SONGS=[
 {name:'The Sky',bpm:127,off:0,sb:17,eb:30,lead:5,vol:[[17,1,0],[25,0,4]],col:[[23,'#8c33cc',2]],diffs:[
  {n:'Easy',lv:2,sp:4,spd:[[23,8]],notes:[N(17,0),N(18,1),N(19,2),N(20,3),N(21,4),N(21.5,4),N(22,4),N(22.5,4),N(23,8),N(23.5,8),N(24,8),N(24.5,8)]},
  {n:'Normal',lv:5,sp:4,spd:[[23,8]],notes:gen(17,29.5,.5,[0,1,2,5,8,7,6,3,4])}]},
-{name:'Neon Night',bpm:140,off:0,sb:8,eb:30,lead:3,vol:[[8,1,0],[26,0,4]],col:[[16,'#cc3366',2]],diffs:[
+{name:'Solar Flare',bpm:140,off:0,sb:8,eb:30,lead:3,vol:[[8,1,0],[26,0,4]],col:[[16,'#cc3366',2]],diffs:[
  {n:'Normal',lv:4,sp:4,spd:[],notes:gen(8,29,1,[4,0,2,8,6,1,7])},
  {n:'Hard',lv:7,sp:6,spd:[[20,9]],notes:gen(8,29.5,.5,[0,4,8,2,4,6,1,5,7,3])}]},
-{name:'Last Dawn',bpm:100,off:0,sb:4,eb:24,lead:3,vol:[[4,1,0],[20,0,4]],col:[[12,'#2a7fff',2]],diffs:[
+{name:'Subsuming Vortex',bpm:100,off:0,sb:4,eb:24,lead:3,vol:[[4,1,0],[20,0,4]],col:[[12,'#2a7fff',2]],diffs:[
  {n:'Easy',lv:1,sp:3,spd:[],notes:gen(4,23,1,[4,1,7,3,5])},
  {n:'Normal',lv:4,sp:4,spd:[],notes:gen(4,23.5,.5,[0,1,2,5,8,7,6,3])}]}];
 let si=0,di=0,ac,G=null;
@@ -73,31 +78,33 @@ function startGame(){
  else for(let b=Math.ceil(pb);b<=s.eb;b++){const tt=t0+lead+bs(b)-ms,o=ac.createOscillator(),e=ac.createGain();o.frequency.value=b%4?440:880;
   o.connect(e);e.connect(gn);e.gain.setValueAtTime(.35,tt);e.gain.exponentialRampToValueAtTime(.001,tt+.06);o.start(tt);o.stop(tt+.07)}
  G={s,d,notes,idx:0,act:[],t0,st0:ms-lead,et,dist,gn,src,hit:0,miss:0,score:0,combo:0,cx:0,cy:0,fx:[],done:false,
-  vol:ev(s.vol,1,(a,b,k)=>a+(b-a)*k,bs,spb),col:ev(s.col.map(([b,h,du])=>[b,hex(h),du]),[10,10,22],(a,b,k)=>a.map((x,i)=>x+(b[i]-x)*k),bs,spb)};
+  vol:ev(s.vol,1,(a,b,k)=>a+(b-a)*k,bs,spb),col:ev(s.col.map(([b,h,du])=>[b,hex(h),du]),[29,37,53],(a,b,k)=>a.map((x,i)=>x+(b[i]-x)*k),bs,spb)};
 }
 const mult=()=>G.combo>=30?8:G.combo>=20?4:G.combo>=10?2:1,cl=(v,m)=>Math.max(-m,Math.min(m,v));
 addEventListener('mousemove',e=>{if(!G||G.done)return;
  if(document.pointerLockElement===cv){G.cx=cl(G.cx+e.movementX*.01,1.475);G.cy=cl(G.cy-e.movementY*.01,1.475)}
- else{const k=.275*H;G.cx=cl((e.clientX-W/2)/k,1.475);G.cy=cl(-(e.clientY-H/2)/k,1.475)}});
+ else{const k=.175*H;G.cx=cl((e.clientX-W/2)/k,1.475);G.cy=cl(-(e.clientY-H/2)/k,1.475)}});
 function judge(n,T){const px=(n.c%3-1)*1.1,py=(Math.floor(n.c/3)-1)*1.1,h=(.9+.25)/2;
  const ok=Math.abs(G.cx-px)<h&&Math.abs(G.cy-py)<h;
  if(ok){G.hit++;G.combo++;G.score+=300*mult()}else{G.miss++;G.combo=0}G.fx.push({x:px,y:py,t:T,ok})}
 function finish(){G.done=true;G.src&&G.src.stop();G.gn.disconnect();document.exitPointerLock?.();
  const n=G.hit+G.miss;$('rtxt').innerHTML=`${G.s.name} · ${G.d.n}<br>SCORE ${G.score}<br>HIT ${G.hit} / MISS ${G.miss}<br>정확도 ${n?Math.round(G.hit/n*100):0}%`;G=null;show('result')}
-const f=()=>H*2.2,P=(x,y,z)=>{const k=f()/(z+8);return[W/2+x*k,H/2-y*k,k]};
-function board(){g.strokeStyle='#4b57c8';g.lineWidth=2;for(let c=0;c<9;c++){const x=(c%3-1)*1.1,y=(Math.floor(c/3)-1)*1.1,a=P(x,y,0),k=a[2];g.strokeRect(a[0]-k/2,a[1]-k/2,k,k)}}
-function hud(T){g.fillStyle='#e8ecff';g.font=`600 ${H*.04}px system-ui`;g.textAlign='left';
- [`HIT ${G.hit}`,`MISS ${G.miss}`,`SCORE ${G.score}`,`COMBO ${G.combo}`].forEach((t,i)=>g.fillText(t,W*.03,H*.2+i*H*.07));
- g.textAlign='right';const e=Math.max(0,T-G.st0);g.fillText(`${String(Math.floor(e/60)).padStart(2,'0')}:${String(Math.floor(e%60)).padStart(2,'0')}`,W*.97,H*.2);
- g.font=`700 ${H*.09}px system-ui`;g.fillStyle=mult()>1?'#ffd25e':'#e8ecff';g.fillText('x'+mult(),W*.97,H*.34)}
+const f=()=>H*1.4,P=(x,y,z)=>{const k=f()/(z+8);return[W/2+x*k,H/2-y*k,k]};
+function bg(a,b,c,d){const y=H*.55,s=g.createLinearGradient(0,0,0,y);s.addColorStop(0,a);s.addColorStop(1,b);g.fillStyle=s;g.fillRect(0,0,W,y);const t=g.createLinearGradient(0,y,0,H);t.addColorStop(0,c);t.addColorStop(1,d);g.fillStyle=t;g.fillRect(0,y,W,H-y)}
+function board(){g.lineWidth=1;g.strokeStyle='rgba(255,255,255,.13)';g.fillStyle='rgba(70,70,70,.55)';for(let c=0;c<9;c++){const x=(c%3-1)*1.1,y=(Math.floor(c/3)-1)*1.1,a=P(x,y,0),k=a[2]*1.1;g.fillRect(a[0]-k/2,a[1]-k/2,k,k);g.strokeRect(a[0]-k/2,a[1]-k/2,k,k)}}
+function hud(T){const e=Math.max(0,T-G.st0),L=W*.2,R=W*.82,F=n=>`${n}px Arial,Helvetica,sans-serif`;g.fillStyle='#fff';g.textBaseline='middle';g.textAlign='center';
+ g.font=F(H*.062);g.fillText(`Score: ${G.score}`,L,H*.275);
+ g.font=F(H*.058);g.fillText(`Hit: ${G.hit}`,L,H*.485);g.fillText(`Miss: ${G.miss}`,L,H*.578);g.fillText(`${G.combo} combo`,L,H*.7);
+ g.font=F(H*.05);g.fillText(`${Math.floor(e/60)}:${String(Math.floor(e%60)).padStart(2,'0')}`,R,H*.26);
+ g.font=F(H*.11);g.fillStyle=mult()>1?'#ffd25e':'#fff';g.fillText('x'+mult(),R,H*.63)}
 function frame(){requestAnimationFrame(frame);
- if(!G){g.fillStyle='#0a0a16';g.fillRect(0,0,W,H);board();return}
+ if(!G){bg('#6d87ad','#bccadb','#7a716a','#5a524c');return}
  const T=G.st0+ac.currentTime-G.t0,dn=G.dist(T),c=G.col(T);
  G.gn.gain.value=G.vol(T);
  while(G.idx<G.notes.length&&G.notes[G.idx].d-dn<=40)G.act.push(G.notes[G.idx++]);
  for(let i=G.act.length-1;i>=0;i--)if(T>=G.act[i].t){judge(G.act[i],T);G.act.splice(i,1)}
  if(T>=G.et){finish();return}
- g.fillStyle=`rgb(${c.map(Math.round)})`;g.fillRect(0,0,W,H);board();
+ const r=c.map(Math.round),h=r.map((v,i)=>Math.min(255,Math.round(v*.45+[45,60,90][i])));bg(`rgb(${r})`,`rgb(${h})`,'#0e0e0e','#000');board();
  for(let i=G.act.length-1;i>=0;i--){const n=G.act[i],z=n.d-dn,p=P((n.c%3-1)*1.1,(Math.floor(n.c/3)-1)*1.1,z),s=.9*p[2];
   g.globalAlpha=Math.max(0,Math.min(1,(40-z)/8));g.fillStyle='#5ee6ff';g.fillRect(p[0]-s/2,p[1]-s/2,s,s);g.globalAlpha=1}
  G.fx=G.fx.filter(e=>T-e.t<.3);G.fx.forEach(e=>{const p=P(e.x,e.y,0),r=(T-e.t)/.3;g.strokeStyle=e.ok?'#7dff9b':'#ff5a6e';g.globalAlpha=1-r;g.lineWidth=4;g.strokeRect(p[0]-p[2]*(.5+r*.3),p[1]-p[2]*(.5+r*.3),p[2]*(1+r*.6),p[2]*(1+r*.6));g.globalAlpha=1});
